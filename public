@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Photo Studio (Manual + AI)</title>
+  <meta name="theme-color" content="#ffffff" />
+  <style>
+    :root{
+      --bg:#ffffff;
+      --panel:#f6f6f6;
+      --panel2:#fbfbfb;
+      --border:#e6e6e6;
+      --text:#0b0b0b;
+      --muted:#6b6b6b;
+      --accent:#111;
+      --ok:#16a34a;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --shadow: 0 10px 28px rgba(0,0,0,.08);
+      --r:16px;
+      --font: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:var(--font);background:var(--bg);color:var(--text)}
+    header{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:12px 16px;border-bottom:1px solid var(--border);background:#fff;position:sticky;top:0;z-index:5;
+    }
+    .leftHead{display:flex;align-items:center;gap:10px}
+    .brand{font-weight:800;letter-spacing:.2px}
+    .status{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--panel2);
+      font-size:12px;
+    }
+    .dot{width:10px;height:10px;border-radius:999px;background:var(--ok)}
+    .rightHead{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+    .dt{font-weight:700;font-size:12px}
+    .tm{font-family:var(--mono);font-size:12px;color:var(--muted)}
+
+    .wrap{display:grid;grid-template-columns: 320px 1fr;gap:12px;padding:12px;max-width:1400px;margin:0 auto}
+    .card{
+      background:var(--panel2);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .card h3{margin:0;padding:12px 12px;border-bottom:1px solid var(--border);background:var(--panel);font-size:13px}
+    .card .body{padding:12px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column;gap:8px}
+    label{font-size:12px;color:var(--muted)}
+    input[type="file"]{width:100%}
+    input[type="range"]{width:100%}
+    textarea, select, input[type="text"]{
+      width:100%;padding:10px 10px;border:1px solid var(--border);border-radius:12px;background:#fff;font-size:13px;
+    }
+    textarea{min-height:90px;resize:vertical}
+    .btn{
+      border:1px solid var(--border);background:#fff;border-radius:12px;
+      padding:10px 12px;font-weight:700;font-size:12px;cursor:pointer;
+    }
+    .btn:hover{filter:brightness(.98)}
+    .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .btn.bad{background:var(--bad);color:#fff;border-color:var(--bad)}
+    .btn.warn{background:var(--warn);color:#111;border-color:var(--warn)}
+    .hint{font-size:12px;color:var(--muted);line-height:1.35}
+    .split{display:grid;grid-template-columns: 1fr 1fr;gap:12px}
+    .viewer{
+      display:grid;grid-template-columns: 1fr;gap:12px;
+    }
+    .stage{
+      padding:12px;
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:10px;
+    }
+    .canvasWrap{
+      background:#fff;border:1px solid var(--border);border-radius:16px;padding:10px;
+      display:flex;justify-content:center;align-items:center;min-height:420px;position:relative;
+    }
+    canvas{max-width:100%;height:auto;border-radius:12px}
+    .tabs{display:flex;gap:8px;padding:10px;border-bottom:1px solid var(--border);background:var(--panel)}
+    .tab{padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:#fff;font-size:12px;font-weight:800;cursor:pointer}
+    .tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .small{font-size:11px;color:var(--muted)}
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;font-size:12px;
+      padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:#fff;
+    }
+    .pill strong{font-family:var(--mono)}
+    .maskToolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="leftHead">
+      <div class="brand">Photo Studio</div>
+      <div class="status" title="Current session status">
+        <div id="statusDot" class="dot"></div>
+        <div id="statusText">Online</div>
+      </div>
+    </div>
+    <div class="rightHead">
+      <div class="dt" id="dateDay">—</div>
+      <div class="tm" id="timeNow">—</div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <!-- LEFT PANEL -->
+    <div class="col" style="gap:12px">
+      <div class="card">
+        <h3>1) Load Photo</h3>
+        <div class="body col">
+          <label>Select an image (JPG/PNG/WebP)</label>
+          <input id="fileInput" type="file" accept="image/*" />
+          <div class="row">
+            <button class="btn" id="btnReset">Reset</button>
+            <button class="btn bad" id="btnClear">Clear</button>
+          </div>
+          <div class="hint">
+            Manual edits run instantly in your browser. AI edits require your backend endpoint
+            (<span style="font-family:var(--mono)">/api/ai-edit</span>).
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>2) Manual Editor</h3>
+        <div class="body col">
+          <div class="row">
+            <button class="btn" id="btnRotateL">Rotate -90°</button>
+            <button class="btn" id="btnRotateR">Rotate +90°</button>
+            <button class="btn" id="btnFlipX">Flip X</button>
+            <button class="btn" id="btnFlipY">Flip Y</button>
+          </div>
+
+          <div class="split">
+            <div class="col">
+              <label>Brightness</label>
+              <input id="rngBrightness" type="range" min="0" max="200" value="100" />
+            </div>
+            <div class="col">
+              <label>Contrast</label>
+              <input id="rngContrast" type="range" min="0" max="200" value="100" />
+            </div>
+            <div class="col">
+              <label>Saturation</label>
+              <input id="rngSaturate" type="range" min="0" max="200" value="100" />
+            </div>
+            <div class="col">
+              <label>Blur</label>
+              <input id="rngBlur" type="range" min="0" max="20" value="0" />
+            </div>
+          </div>
+
+          <div class="row">
+            <button class="btn" id="btnApply">Apply to Canvas</button>
+            <button class="btn primary" id="btnDownload">Download PNG</button>
+          </div>
+
+          <div class="hint">
+            Tip: Use “Apply to Canvas” after adjusting sliders so the changes are baked into the image (download-ready).
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>3) AI Editor (Clothes / Color / Background)</h3>
+        <div class="body col">
+          <label>Mode</label>
+          <select id="aiMode">
+            <option value="clothes">Clothes Change</option>
+            <option value="color">Color Change</option>
+            <option value="background">Background Replace</option>
+            <option value="retouch">Retouch / Enhance</option>
+          </select>
+
+          <label>AI Instruction (Prompt)</label>
+          <textarea id="aiPrompt" placeholder="Example: Replace the t-shirt with a black blazer. Keep face and body unchanged. Make it realistic."></textarea>
+
+          <div class="pill">
+            Mask: <strong id="maskState">OFF</strong>
+            <span class="small">(optional — paint area to edit)</span>
+          </div>
+
+          <div class="maskToolbar">
+            <button class="btn" id="btnMaskToggle">Enable Mask</button>
+            <button class="btn" id="btnMaskClear">Clear Mask</button>
+            <label class="small">Brush</label>
+            <input id="rngBrush" type="range" min="5" max="80" value="24" />
+          </div>
+
+          <div class="row">
+            <button class="btn primary" id="btnAiRun">Run AI Edit</button>
+            <button class="btn" id="btnAiUseResult">Use AI Result on Canvas</button>
+          </div>
+
+          <div class="hint" id="aiHint">
+            If you haven’t configured a real AI endpoint, the server returns Demo Mode (same image).
+            To enable real AI: set <span style="font-family:var(--mono)">AI_IMAGE_ENDPOINT</span> in your server environment.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT VIEWER -->
+    <div class="viewer">
+      <div class="card">
+        <div class="tabs">
+          <div class="tab active" id="tabCanvas">Canvas</div>
+          <div class="tab" id="tabAi">AI Result</div>
+        </div>
+
+        <div class="stage">
+          <div class="canvasWrap">
+            <canvas id="mainCanvas" width="960" height="540"></canvas>
+            <canvas id="maskCanvas" width="960" height="540" style="position:absolute;inset:0;opacity:.35;display:none;pointer-events:none;"></canvas>
+          </div>
+          <div class="row" style="justify-content:space-between">
+            <div class="small" id="metaInfo">No image loaded.</div>
+            <div class="small" id="netInfo">Backend: <span style="font-family:var(--mono)">/api/ai-edit</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+/* =========================
+   Top Right Date/Time/Day
+========================= */
+const elDateDay = document.getElementById("dateDay");
+const elTimeNow = document.getElementById("timeNow");
+
+function tickTime(){
+  const now = new Date();
+  const day = now.toLocaleDateString(undefined, { weekday:"long" });
+  const date = now.toLocaleDateString(undefined, { year:"numeric", month:"long", day:"2-digit" });
+  const time = now.toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+  elDateDay.textContent = `${day} • ${date}`;
+  elTimeNow.textContent = time;
+}
+tickTime();
+setInterval(tickTime, 1000);
+
+/* =========================
+   Active Status
+========================= */
+const statusDot = document.getElementById("statusDot");
+const statusText = document.getElementById("statusText");
+function setStatus(kind, text){
+  statusText.textContent = text;
+  const map = { ok:"#16a34a", warn:"#f59e0b", bad:"#ef4444" };
+  statusDot.style.background = map[kind] || map.ok;
+}
+
+/* =========================
+   Canvas + Image State
+========================= */
+const fileInput = document.getElementById("fileInput");
+const mainCanvas = document.getElementById("mainCanvas");
+const maskCanvas = document.getElementById("maskCanvas");
+const ctx = mainCanvas.getContext("2d");
+const mctx = maskCanvas.getContext("2d");
+
+const metaInfo = document.getElementById("metaInfo");
+const tabCanvas = document.getElementById("tabCanvas");
+const tabAi = document.getElementById("tabAi");
+
+let imgOriginal = null;         // Image object (source)
+let imgWorking = null;          // Image object (current canvas snapshot as data URL)
+let aiResultDataUrl = null;     // AI result data URL
+let rotation = 0;               // degrees
+let flipX = 1;
+let flipY = 1;
+
+function fitCanvasToImage(image){
+  // Keep decent resolution but not insane
+  const maxW = 1400, maxH = 900;
+  let w = image.naturalWidth;
+  let h = image.naturalHeight;
+
+  const scale = Math.min(1, maxW / w, maxH / h);
+  w = Math.round(w * scale);
+  h = Math.round(h * scale);
+
+  mainCanvas.width = w;
+  mainCanvas.height = h;
+  maskCanvas.width = w;
+  maskCanvas.height = h;
+
+  // Clear mask
+  mctx.clearRect(0,0,maskCanvas.width,maskCanvas.height);
+}
+
+function drawBase(image){
+  ctx.save();
+  ctx.clearRect(0,0,mainCanvas.width,mainCanvas.height);
+
+  // Transform
+  const w = mainCanvas.width;
+  const h = mainCanvas.height;
+
+  ctx.translate(w/2, h/2);
+  ctx.rotate(rotation * Math.PI/180);
+  ctx.scale(flipX, flipY);
+
+  // draw centered
+  const iw = image.naturalWidth;
+  const ih = image.naturalHeight;
+
+  // If canvas was fit to image (scaled), draw to canvas size
+  // But rotation can swap dimensions; easiest: draw to unrotated canvas bounds.
+  ctx.drawImage(image, -w/2, -h/2, w, h);
+
+  ctx.restore();
+}
+
+function loadImageFromFile(file){
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const im = new Image();
+    im.onload = () => { URL.revokeObjectURL(url); resolve(im); };
+    im.onerror = () => reject(new Error("Failed to load image."));
+    im.src = url;
+  });
+}
+
+fileInput.addEventListener("change", async ()=>{
+  const f = fileInput.files?.[0];
+  if(!f) return;
+  try{
+    setStatus("warn","Editing");
+    const im = await loadImageFromFile(f);
+    imgOriginal = im;
+    imgWorking = null;
+    aiResultDataUrl = null;
+    rotation = 0; flipX = 1; flipY = 1;
+
+    fitCanvasToImage(im);
+    drawWithFilters(im);
+    metaInfo.textContent = `Loaded: ${f.name} • ${im.naturalWidth}×${im.naturalHeight}`;
+    setStatus("ok","Online");
+  }catch(e){
+    setStatus("bad","Offline");
+    alert(e.message || String(e));
+  }
+});
+
+/* =========================
+   Manual Filters (preview + apply)
+========================= */
+const rngBrightness = document.getElementById("rngBrightness");
+const rngContrast = document.getElementById("rngContrast");
+const rngSaturate = document.getElementById("rngSaturate");
+const rngBlur = document.getElementById("rngBlur");
+
+function currentFilterString(){
+  return `brightness(${rngBrightness.value}%) contrast(${rngContrast.value}%) saturate(${rngSaturate.value}%) blur(${rngBlur.value}px)`;
+}
+
+function drawWithFilters(image){
+  if(!image) return;
+  ctx.save();
+  ctx.filter = currentFilterString();
+  drawBase(image);
+  ctx.restore();
+}
+
+[rngBrightness, rngContrast, rngSaturate, rngBlur].forEach(el=>{
+  el.addEventListener("input", ()=>{
+    if(!imgOriginal) return;
+    setStatus("warn","Editing");
+    const source = imgWorking ? dataUrlToImage(imgWorking.src) : imgOriginal;
+    // dataUrlToImage is async-ish; instead just draw original for preview
+    drawWithFilters(imgOriginal);
+    setStatus("ok","Online");
+  });
+});
+
+function dataUrlToImage(dataUrl){
+  const im = new Image();
+  im.src = dataUrl;
+  return im;
+}
+
+document.getElementById("btnRotateL").addEventListener("click", ()=>{
+  if(!imgOriginal) return;
+  rotation = (rotation - 90) % 360;
+  setStatus("warn","Editing");
+  drawWithFilters(imgOriginal);
+  setStatus("ok","Online");
+});
+document.getElementById("btnRotateR").addEventListener("click", ()=>{
+  if(!imgOriginal) return;
+  rotation = (rotation + 90) % 360;
+  setStatus("warn","Editing");
+  drawWithFilters(imgOriginal);
+  setStatus("ok","Online");
+});
+document.getElementById("btnFlipX").addEventListener("click", ()=>{
+  if(!imgOriginal) return;
+  flipX *= -1;
+  setStatus("warn","Editing");
+  drawWithFilters(imgOriginal);
+  setStatus("ok","Online");
+});
+document.getElementById("btnFlipY").addEventListener("click", ()=>{
+  if(!imgOriginal) return;
+  flipY *= -1;
+  setStatus("warn","Editing");
+  drawWithFilters(imgOriginal);
+  setStatus("ok","Online");
+});
+
+document.getElementById("btnApply").addEventListener("click", async ()=>{
+  if(!imgOriginal) return;
+  setStatus("warn","Saved");
+  // Bake current preview into a dataURL snapshot
+  const dataUrl = mainCanvas.toDataURL("image/png");
+  const im = new Image();
+  im.onload = ()=>{
+    imgWorking = im;
+    // Reset transform after baking? Keep transform as-is for consistency
+    metaInfo.textContent = `Applied edits to canvas • ${mainCanvas.width}×${mainCanvas.height}`;
+    setStatus("ok","Online");
+  };
+  im.src = dataUrl;
+});
+
+document.getElementById("btnDownload").addEventListener("click", ()=>{
+  if(!imgOriginal) return;
+  const a = document.createElement("a");
+  a.download = "edited.png";
+  a.href = mainCanvas.toDataURL("image/png");
+  a.click();
+});
+
+document.getElementById("btnReset").addEventListener("click", ()=>{
+  if(!imgOriginal) return;
+  rotation = 0; flipX = 1; flipY = 1;
+  rngBrightness.value = 100;
+  rngContrast.value = 100;
+  rngSaturate.value = 100;
+  rngBlur.value = 0;
+  imgWorking = null;
+  drawWithFilters(imgOriginal);
+  metaInfo.textContent = "Reset to original (preview).";
+});
+
+document.getElementById("btnClear").addEventListener("click", ()=>{
+  imgOriginal = null; imgWorking = null; aiResultDataUrl = null;
+  ctx.clearRect(0,0,mainCanvas.width,mainCanvas.height);
+  mctx.clearRect(0,0,maskCanvas.width,maskCanvas.height);
+  fileInput.value = "";
+  metaInfo.textContent = "No image loaded.";
+});
+
+/* =========================
+   Tabs (Canvas vs AI Result)
+========================= */
+function setActiveTab(which){
+  const isCanvas = which === "canvas";
+  tabCanvas.classList.toggle("active", isCanvas);
+  tabAi.classList.toggle("active", !isCanvas);
+
+  if(isCanvas){
+    if(imgOriginal) drawWithFilters(imgOriginal);
+  }else{
+    if(!aiResultDataUrl){
+      alert("No AI result yet. Run AI Edit first.");
+      tabCanvas.click();
+      return;
+    }
+    const im = new Image();
+    im.onload = ()=>{
+      fitCanvasToImage(im);
+      rotation = 0; flipX = 1; flipY = 1;
+      // Clear filters for display
+      rngBrightness.value = 100; rngContrast.value = 100; rngSaturate.value = 100; rngBlur.value = 0;
+      drawBase(im);
+      metaInfo.textContent = "Viewing AI Result (not yet applied).";
+    };
+    im.src = aiResultDataUrl;
+  }
+}
+tabCanvas.addEventListener("click", ()=>setActiveTab("canvas"));
+tabAi.addEventListener("click", ()=>setActiveTab("ai"));
+
+/* =========================
+   Mask Painting (optional)
+========================= */
+const btnMaskToggle = document.getElementById("btnMaskToggle");
+const btnMaskClear = document.getElementById("btnMaskClear");
+const rngBrush = document.getElementById("rngBrush");
+const maskState = document.getElementById("maskState");
+
+let maskEnabled = false;
+let painting = false;
+
+function setMaskEnabled(on){
+  maskEnabled = on;
+  maskCanvas.style.display = on ? "block" : "none";
+  maskCanvas.style.pointerEvents = on ? "auto" : "none";
+  maskState.textContent = on ? "ON" : "OFF";
+  btnMaskToggle.textContent = on ? "Disable Mask" : "Enable Mask";
+}
+setMaskEnabled(false);
+
+btnMaskToggle.addEventListener("click", ()=>{
+  if(!imgOriginal) return alert("Load an image first.");
+  setMaskEnabled(!maskEnabled);
+});
+
+btnMaskClear.addEventListener("click", ()=>{
+  mctx.clearRect(0,0,maskCanvas.width,maskCanvas.height);
+});
+
+function canvasPointFromEvent(ev, canvas){
+  const rect = canvas.getBoundingClientRect();
+  const x = (ev.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (ev.clientY - rect.top) * (canvas.height / rect.height);
+  return {x,y};
+}
+
+maskCanvas.addEventListener("mousedown", (ev)=>{
+  if(!maskEnabled) return;
+  painting = true;
+  const {x,y} = canvasPointFromEvent(ev, maskCanvas);
+  mctx.save();
+  mctx.globalCompositeOperation = "source-over";
+  mctx.fillStyle = "rgba(255,255,255,1)";
+  mctx.beginPath();
+  mctx.arc(x,y, Number(rngBrush.value)/2, 0, Math.PI*2);
+  mctx.fill();
+  mctx.restore();
+});
+maskCanvas.addEventListener("mousemove", (ev)=>{
+  if(!maskEnabled || !painting) return;
+  const {x,y} = canvasPointFromEvent(ev, maskCanvas);
+  mctx.save();
+  mctx.fillStyle = "rgba(255,255,255,1)";
+  mctx.beginPath();
+  mctx.arc(x,y, Number(rngBrush.value)/2, 0, Math.PI*2);
+  mctx.fill();
+  mctx.restore();
+});
+window.addEventListener("mouseup", ()=> painting = false);
+
+/* =========================
+   AI Edit
+========================= */
+const aiMode = document.getElementById("aiMode");
+const aiPrompt = document.getElementById("aiPrompt");
+const btnAiRun = document.getElementById("btnAiRun");
+const btnAiUseResult = document.getElementById("btnAiUseResult");
+
+function canvasToBlob(canvas){
+  return new Promise(resolve => canvas.toBlob(b=>resolve(b), "image/png", 0.95));
+}
+
+btnAiRun.addEventListener("click", async ()=>{
+  if(!imgOriginal) return alert("Load an image first.");
+  const prompt = aiPrompt.value.trim();
+  if(!prompt) return alert("Write an AI instruction (prompt).");
+
+  setStatus("warn","AI Processing");
+  btnAiRun.disabled = true;
+
+  try{
+    // Use current canvas as the input image (includes manual edits preview).
+    // Bake current preview before AI request:
+    drawWithFilters(imgOriginal);
+
+    const imageBlob = await canvasToBlob(mainCanvas);
+
+    let maskBlob = null;
+    if(maskEnabled){
+      // Convert white paint to alpha mask PNG (white=edit area)
+      const tmp = document.createElement("canvas");
+      tmp.width = maskCanvas.width; tmp.height = maskCanvas.height;
+      const tctx = tmp.getContext("2d");
+      tctx.clearRect(0,0,tmp.width,tmp.height);
+      // keep only mask alpha
+      tctx.drawImage(maskCanvas, 0, 0);
+      maskBlob = await new Promise(res=>tmp.toBlob(b=>res(b), "image/png", 0.95));
+    }
+
+    const form = new FormData();
+    form.append("image", imageBlob, "image.png");
+    if(maskBlob) form.append("mask", maskBlob, "mask.png");
+    form.append("prompt", prompt);
+    form.append("mode", aiMode.value);
+
+    const r = await fetch("/api/ai-edit", { method:"POST", body: form });
+    const data = await r.json().catch(()=> ({}));
+    if(!r.ok) throw new Error(data?.error || "AI edit failed.");
+
+    if(data.imageBase64){
+      aiResultDataUrl = data.imageBase64.startsWith("data:")
+        ? data.imageBase64
+        : ("data:image/png;base64," + data.imageBase64);
+    }else if(data.imageUrl){
+      aiResultDataUrl = data.imageUrl; // could be remote URL
+    }else{
+      throw new Error("AI response missing image.");
+    }
+
+    // Switch to AI tab
+    setActiveTab("ai");
+    setStatus("ok","Online");
+
+    if(data.demo){
+      document.getElementById("aiHint").textContent =
+        "Demo Mode active: configure AI_IMAGE_ENDPOINT on the server for real clothes/background edits.";
+    }else{
+      document.getElementById("aiHint").textContent =
+        "AI edit complete. If it looks good, click “Use AI Result on Canvas” to continue editing/download.";
+    }
+
+  }catch(e){
+    setStatus("bad","Offline");
+    alert(e.message || String(e));
+    setStatus("ok","Online");
+  }finally{
+    btnAiRun.disabled = false;
+  }
+});
+
+btnAiUseResult.addEventListener("click", ()=>{
+  if(!aiResultDataUrl) return alert("No AI result yet.");
+  const im = new Image();
+  im.crossOrigin = "anonymous";
+  im.onload = ()=>{
+    imgOriginal = im;
+    imgWorking = null;
+    aiResultDataUrl = null;
+    fitCanvasToImage(im);
+    // Reset controls
+    rotation = 0; flipX = 1; flipY = 1;
+    rngBrightness.value = 100; rngContrast.value = 100; rngSaturate.value = 100; rngBlur.value = 0;
+    mctx.clearRect(0,0,maskCanvas.width,maskCanvas.height);
+    setMaskEnabled(false);
+
+    drawWithFilters(im);
+    setActiveTab("canvas");
+    metaInfo.textContent = "AI Result applied to canvas as new base image.";
+  };
+  im.src = aiResultDataUrl;
+});
+
+// Initial status
+setStatus("ok","Online");
+</script>
+</body>
+</html>
